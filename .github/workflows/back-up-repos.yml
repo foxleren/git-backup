@@ -1,4 +1,4 @@
-name: "Back-up repos"
+name: "Back up repos"
 
 on:
   workflow_dispatch:
