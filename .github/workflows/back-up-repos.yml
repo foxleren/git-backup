@@ -1,0 +1,23 @@
+name: "Back-up repos"
+
+on:
+  workflow_dispatch:
+
+jobs:
+  back-up:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-python@v5
+        with:
+          python-version: 3.12.1
+
+      - name: Install requirements.txt
+        run: pip3 install -r ./requirements.txt
+
+      - name: Execute script
+        run: |
+          python3 ./script.py \
+            --yandex-disk-token ${{secrets.GIT_BACKUP_YANDEX_DISK_TOKEN}} \
+            --github-token ${{secrets.GIT_BACKUP_GITHUB_TOKEN}}
