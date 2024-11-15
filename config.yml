@@ -2,6 +2,10 @@ backups-limit: 10
 repos:
   - git-origin: github
     organization: foxleren
+    repository: git-backup
+    branch: master
+  - git-origin: github
+    organization: foxleren
     repository: notes
     branch: master
   - git-origin: github
