@@ -44,8 +44,8 @@ class BackupClient:
         self._config = self._read_config()
         self._yandex_disk_client = yadisk.AsyncClient(token=yandex_disk_token, session="aiohttp")
         self._github_headers = {"Authorization": f"Bearer {github_token}"}
-        self._git_origin_to_download_repo_archive_method: Dict[
-            GitOrigin, Callable[[ConfigRepo, str], Awaitable[None]]] = {
+        self._git_origin_to_download_repo_archive_method: \
+            Dict[GitOrigin, Callable[[ConfigRepo, str], Awaitable[None]]] = {
             GitOrigin.github: self._download_github_repo_archive
         }
 
