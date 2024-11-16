@@ -1,4 +1,4 @@
-backups-limit: 10
+backups-limit: 3
 repos:
   - git-origin: github
     organization: foxleren
