@@ -19,7 +19,7 @@ repos:
     branch: master
     backups-limit: 3
   - git-origin: github
-    organization: xority
+    organization: xority-space
     repository: xority-snapshot-19-10-2024
     branch: master
     backups-limit: 3
