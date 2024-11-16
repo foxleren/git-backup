@@ -1,4 +1,3 @@
-import asyncio
 import datetime
 import shutil
 from collections.abc import Callable
@@ -57,8 +56,7 @@ class BackupClient:
     async def back_up_repos(self):
         for repo in self._config.repos:
             await self._back_up_repo(repo)
-
-        await self._delete_outdated_repos_backups()
+            await self._delete_outdated_repo_backups(repo)
 
         # Deleting directory with downloaded repositories
         shutil.rmtree(self._DOWNLOADED_REPOS_FOLDER_PATH)
@@ -156,15 +154,8 @@ class BackupClient:
                 await self._yandex_disk_client.mkdir(full_folder_path)
                 logger.info(f"Path {{{full_folder_path}}} is successfully created.")
 
-    async def _delete_outdated_repos_backups(self):
-        logger.info(f"Started deleting outdated repos backups. "
-                    f"Current global backups-limit={{{self._config.backups_limit}}}.")
-        for repo in self._config.repos:
-            await self._delete_outdated_repo_backups(repo)
-        logger.info(f"Finished deleting outdated repos backups.")
-
     async def _delete_outdated_repo_backups(self, repo: ConfigRepo):
-        backups_limit = self._get_backups_limit(repo)
+        backups_limit = self._get_repo_backups_limit(repo)
         logger.info(f"Started deleting outdated backups for repo={{{repo}}} with backups-limit={{{backups_limit}}}.")
         backups_count = 0
         backups_to_delete = []
@@ -198,7 +189,7 @@ class BackupClient:
     def _get_absolute_backup_dir_path(self, repo: ConfigRepo) -> str:
         return f"{self._ROOT_PATH}{self._get_relative_backup_dir_path(repo)}"
 
-    def _get_backups_limit(self, repo: ConfigRepo) -> int:
+    def _get_repo_backups_limit(self, repo: ConfigRepo) -> int:
         return repo.backups_limit or self._config.backups_limit
 
     @staticmethod
