@@ -38,6 +38,10 @@ class BackupClient:
     _DOWNLOADED_REPOS_FOLDER_PATH = "./downloaded_repos"
     _READ_ARCHIVE_CHUNK_BYTES = 102400  # 100 KB
 
+    _ROOT_PATH = "app:/"
+    _YANDEX_DISK_RETRIES_COUNT = 5
+    _YANDEX_DISK_RETRIES_INTERVAL_SECONDS = 1
+
     def __init__(self,
                  yandex_disk_token: str,
                  github_token: str):
@@ -52,10 +56,15 @@ class BackupClient:
     async def back_up_repos(self):
         backup_tasks = []
         for repo in self._config.repos:
-            backup_tasks.append(self.back_up_repo(repo=repo))
+            backup_tasks.append(self._back_up_repo(repo=repo))
         await asyncio.gather(*backup_tasks)
 
-    async def back_up_repo(self, repo: ConfigRepo):
+        await self._delete_outdated_repos_backups()
+
+        # Deleting directory with downloaded repositories
+        shutil.rmtree(self._DOWNLOADED_REPOS_FOLDER_PATH)
+
+    async def _back_up_repo(self, repo: ConfigRepo):
         logger.info(f"Performing back up for repo={{{repo}}}")
         git_origin_value = repo.git_origin.value
         organization = repo.organization
@@ -74,7 +83,6 @@ class BackupClient:
 
     async def shutdown(self):
         await self._yandex_disk_client.close()
-        shutil.rmtree(self._DOWNLOADED_REPOS_FOLDER_PATH)
 
     def _read_config(self) -> Config:
         with open(self._CONFIG_PATH, "r") as f:
@@ -106,11 +114,24 @@ class BackupClient:
 
         upload_link = await self._yandex_disk_client.get_upload_link(
             file_path,
-            overwrite=True)
+            overwrite=True,
+            n_retries=self._YANDEX_DISK_RETRIES_COUNT,
+            retry_interval=self._YANDEX_DISK_RETRIES_INTERVAL_SECONDS
+        )
 
-        await self._yandex_disk_client.upload_by_link(archive_path, upload_link)
+        await self._yandex_disk_client.upload_by_link(
+            archive_path,
+            upload_link,
+            n_retries=self._YANDEX_DISK_RETRIES_COUNT,
+            retry_interval=self._YANDEX_DISK_RETRIES_INTERVAL_SECONDS
+        )
         # Yandex Disk slows down the download of .zip archives, so we upload as a raw file and then rename it.
-        await self._yandex_disk_client.rename(file_path, f"{archive_file_name_non_zip}.zip")
+        await self._yandex_disk_client.rename(
+            file_path,
+            f"{archive_file_name_non_zip}.zip",
+            n_retries=self._YANDEX_DISK_RETRIES_COUNT,
+            retry_interval=self._YANDEX_DISK_RETRIES_INTERVAL_SECONDS
+        )
 
         logger.info(f"Successfully uploaded repo={{{repo}}}")
 
@@ -127,7 +148,60 @@ class BackupClient:
             current_folder_path += f"/{stripped_folder}"
 
             full_folder_path = f"{root_path}{current_folder_path}"
-            if not await self._yandex_disk_client.exists(full_folder_path):
+            if not await self._yandex_disk_client.exists(
+                    full_folder_path,
+                    n_retries=self._YANDEX_DISK_RETRIES_COUNT,
+                    retry_interval=self._YANDEX_DISK_RETRIES_INTERVAL_SECONDS
+            ):
                 logger.info(f"Path {{{full_folder_path}}} doesn't exist. Creating...")
                 await self._yandex_disk_client.mkdir(full_folder_path)
                 logger.info(f"Path {{{full_folder_path}}} is successfully created.")
+
+    async def _delete_outdated_repos_backups(self):
+        logger.info(f"Started deleting outdated repos backups. Current backups-limit={{{self._config.backups_limit}}}.")
+        for repo in self._config.repos:
+            await self._delete_outdated_repo_backups(repo)
+        logger.info(f"Finished deleting outdated repos backups.")
+
+    async def _delete_outdated_repo_backups(self, repo: ConfigRepo):
+        logger.info(f"Started deleting outdated backups for repo={{{repo}}}.")
+        backups_count = 0
+        backups_to_delete = []
+        backups_dir_path = self._get_absolute_backup_dir_path(repo)
+        async for backup in self._yandex_disk_client.listdir(
+                backups_dir_path,
+                sort="-created",
+                n_retries=self._YANDEX_DISK_RETRIES_COUNT,
+                retry_interval=self._YANDEX_DISK_RETRIES_INTERVAL_SECONDS
+        ):
+            backups_count += 1
+            if backups_count > self._config.backups_limit:
+                backups_to_delete.append(backup)
+
+        logger.info(f"Found {self._config.backups_limit - backups_count} backups for repo={{{repo}}} "
+                    f"that exceed the limit on backups.")
+        for backup in backups_to_delete:
+            logger.info(f"Deleting backup={{{backup.name}}} for repo={{{repo}}}...")
+            await self._yandex_disk_client.remove(
+                backup.path,
+                n_retries=self._YANDEX_DISK_RETRIES_COUNT,
+                retry_interval=self._YANDEX_DISK_RETRIES_INTERVAL_SECONDS
+            )
+            logger.info(f"Deleted backup={{{backup.name}}} for repo={{{repo}}}.")
+        logger.info(f"Finished deleting outdated backups for repo={{{repo}}}.")
+
+    @staticmethod
+    def _get_relative_backup_dir_path(repo: ConfigRepo) -> str:
+        return f"{repo.git_origin.value}/{repo.organization}/{repo.repository}"
+
+    def _get_absolute_backup_dir_path(self, repo: ConfigRepo) -> str:
+        return f"{self._ROOT_PATH}{self._get_relative_backup_dir_path(repo)}"
+
+    @staticmethod
+    def _get_non_zip_backup_file_name(repo: ConfigRepo) -> str:
+        return (f"{repo.git_origin.value}_{repo.organization}_{repo.repository}_"
+                f"{datetime.datetime.now().strftime("%Y-%m-%dT%H:%M:%S")}")
+
+    def _get_non_zip_backup_file_path(self, repo: ConfigRepo):
+        return (f"{self._ROOT_PATH}{self._get_relative_backup_dir_path(repo)}/"
+                f"{self._get_non_zip_backup_file_name(repo)}")
