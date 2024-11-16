@@ -3,7 +3,7 @@ import datetime
 import shutil
 from collections.abc import Callable
 from pathlib import Path
-from typing import List, Dict, Awaitable
+from typing import List, Dict, Awaitable, Optional
 
 import aiofiles
 import aiohttp
@@ -26,6 +26,7 @@ class ConfigRepo(BaseModel):
     organization: str
     repository: str
     branch: str
+    backups_limit: Optional[int] = Field(alias="backups-limit", default=None)
 
 
 class Config(BaseModel):
@@ -158,13 +159,15 @@ class BackupClient:
                 logger.info(f"Path {{{full_folder_path}}} is successfully created.")
 
     async def _delete_outdated_repos_backups(self):
-        logger.info(f"Started deleting outdated repos backups. Current backups-limit={{{self._config.backups_limit}}}.")
+        logger.info(f"Started deleting outdated repos backups. "
+                    f"Current global backups-limit={{{self._config.backups_limit}}}.")
         for repo in self._config.repos:
             await self._delete_outdated_repo_backups(repo)
         logger.info(f"Finished deleting outdated repos backups.")
 
     async def _delete_outdated_repo_backups(self, repo: ConfigRepo):
-        logger.info(f"Started deleting outdated backups for repo={{{repo}}}.")
+        backups_limit = self._get_backups_limit(repo)
+        logger.info(f"Started deleting outdated backups for repo={{{repo}}} with backups-limit={{{backups_limit}}}.")
         backups_count = 0
         backups_to_delete = []
         backups_dir_path = self._get_absolute_backup_dir_path(repo)
@@ -175,7 +178,7 @@ class BackupClient:
                 retry_interval=self._YANDEX_DISK_RETRIES_INTERVAL_SECONDS
         ):
             backups_count += 1
-            if backups_count > self._config.backups_limit:
+            if backups_count > backups_limit:
                 backups_to_delete.append(backup)
 
         logger.info(f"Found {len(backups_to_delete)} backups for repo={{{repo}}} "
@@ -190,18 +193,21 @@ class BackupClient:
             logger.info(f"Deleted backup={{{backup.name}}} for repo={{{repo}}}.")
         logger.info(f"Finished deleting outdated backups for repo={{{repo}}}.")
 
-    @staticmethod
-    def _get_relative_backup_dir_path(repo: ConfigRepo) -> str:
-        return f"{repo.git_origin.value}/{repo.organization}/{repo.repository}"
+    def _get_non_zip_backup_file_path(self, repo: ConfigRepo):
+        return (f"{self._ROOT_PATH}{self._get_relative_backup_dir_path(repo)}/"
+                f"{self._get_non_zip_backup_file_name(repo)}")
 
     def _get_absolute_backup_dir_path(self, repo: ConfigRepo) -> str:
         return f"{self._ROOT_PATH}{self._get_relative_backup_dir_path(repo)}"
+
+    def _get_backups_limit(self, repo: ConfigRepo) -> int:
+        return repo.backups_limit or self._config.backups_limit
+
+    @staticmethod
+    def _get_relative_backup_dir_path(repo: ConfigRepo) -> str:
+        return f"{repo.git_origin.value}/{repo.organization}/{repo.repository}"
 
     @staticmethod
     def _get_non_zip_backup_file_name(repo: ConfigRepo) -> str:
         return (f"{repo.git_origin.value}_{repo.organization}_{repo.repository}_"
                 f"{datetime.datetime.now().strftime("%Y-%m-%dT%H:%M:%S")}")
-
-    def _get_non_zip_backup_file_path(self, repo: ConfigRepo):
-        return (f"{self._ROOT_PATH}{self._get_relative_backup_dir_path(repo)}/"
-                f"{self._get_non_zip_backup_file_name(repo)}")
