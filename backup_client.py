@@ -55,10 +55,8 @@ class BackupClient:
         }
 
     async def back_up_repos(self):
-        backup_tasks = []
         for repo in self._config.repos:
-            backup_tasks.append(self._back_up_repo(repo=repo))
-        await asyncio.gather(*backup_tasks)
+            await self._back_up_repo(repo)
 
         await self._delete_outdated_repos_backups()
 
