@@ -178,7 +178,7 @@ class BackupClient:
             if backups_count > self._config.backups_limit:
                 backups_to_delete.append(backup)
 
-        logger.info(f"Found {self._config.backups_limit - backups_count} backups for repo={{{repo}}} "
+        logger.info(f"Found {len(backups_to_delete)} backups for repo={{{repo}}} "
                     f"that exceed the limit on backups.")
         for backup in backups_to_delete:
             logger.info(f"Deleting backup={{{backup.name}}} for repo={{{repo}}}...")
