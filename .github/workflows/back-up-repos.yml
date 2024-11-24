@@ -22,9 +22,14 @@ jobs:
 
       - name: Install requirements.txt
         run: pip3 install -r ./requirements.txt
-
+      
       - name: Execute script
-        run: |
-          python3 ./script.py \
-            --yandex-disk-token ${{secrets.GIT_BACKUP_YANDEX_DISK_TOKEN}} \
-            --github-token ${{secrets.GIT_BACKUP_GITHUB_TOKEN}}
+        uses: nick-fields/retry@v3
+        with:
+          timeout_minutes: 10
+          max_attempts: 10
+          retry_wait_seconds: 15
+          command: |
+            python3 ./script.py \
+              --yandex-disk-token ${{secrets.GIT_BACKUP_YANDEX_DISK_TOKEN}} \
+              --github-token ${{secrets.GIT_BACKUP_GITHUB_TOKEN}}
