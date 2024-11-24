@@ -14,6 +14,14 @@ repos:
     repository: onyxdb
     branch: master
   - git-origin: github
+    organization: onyxdb
+    repository: internal-docs
+    branch: master
+  - git-origin: github
+    organization: onyxdb
+    repository: mongodb-kubernetes-operator
+    branch: master
+  - git-origin: github
     organization: foxleren
     repository: tinkoff-sre
     branch: master
