@@ -27,7 +27,7 @@ jobs:
         uses: nick-fields/retry@v3
         with:
           timeout_minutes: 10
-          max_attempts: 10
+          max_attempts: 15
           retry_wait_seconds: 15
           command: |
             python3 ./script.py \
