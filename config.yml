@@ -1,10 +1,10 @@
-backups-limit: 10
+backups-limit: 15
 repos:
   - git-origin: github
     organization: foxleren
     repository: git-backup
     branch: master
-    backups-limit: 3
+    backups-limit: 10
   - git-origin: github
     organization: foxleren
     repository: notes
@@ -25,9 +25,9 @@ repos:
     organization: foxleren
     repository: tinkoff-sre
     branch: master
-    backups-limit: 3
+    backups-limit: 5
   - git-origin: github
     organization: xority-space
     repository: xority-snapshot-19-10-2024
     branch: master
-    backups-limit: 3
+    backups-limit: 5
