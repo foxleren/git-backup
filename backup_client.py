@@ -9,6 +9,7 @@ import aiohttp
 import yadisk
 import yaml
 from pydantic import BaseModel, Field
+from tenacity import retry, wait_fixed, stop_after_attempt
 
 from common import StringEnum
 from logger import get_common_logger
@@ -99,6 +100,8 @@ class BackupClient:
                         await f.write(chunk)
         logger.info(f"Successfully downloaded repo={{{repo}}}")
 
+    @retry(wait=wait_fixed(_YANDEX_DISK_RETRIES_INTERVAL_SECONDS),
+           stop=stop_after_attempt(_YANDEX_DISK_RETRIES_COUNT))
     async def _upload_repo_archive_to_yandex_disk(self, repo: ConfigRepo, archive_path: str):
         git_origin_value = repo.git_origin.value
 
